@@ -2,6 +2,8 @@ from .options import Option
 
 import os
 import sys
+import json
+from enum import Enum
 
 import inspect
 import argparse
@@ -13,86 +15,122 @@ import yaml
 XDG_CONFIG_DIR = os.environ.get('XDG_CONFIG_DIR', '.config')
 CURRENT_DIR = os.path.abspath(os.path.dirname(sys.argv[0]))
 
-DEFAULT_PATHS = [
+DEFAULT_PATHS = tuple([
     os.path.expanduser('~/.{namerc}'),
     os.path.expanduser('~/{cfg}/{{namerc}}'.format(cfg=XDG_CONFIG_DIR)),
     os.path.join(CURRENT_DIR, '{namerc}')
-]
+])
+
+
+class ConfigTypes(Enum):
+    ini = 'ini'
+    json = 'json'
+    yaml = 'yaml'
+
 
 class Argumentize:
+    ini_config_section = None
+    namerc = None
 
     def __init__(self, name):
         self.name = name
         self._options = OptionReader(self.__class__).options
-        for o in self._options:
-            setattr(self, o.name, o.value)
+        self.from_dict({o.name: o.value for o in self._options.values()})
 
     def from_args(self, args):
         parser = self._gen_argparse()
         options = parser.parse_args(args)
-        for option, value in options._get_kwargs():
-            if value is None:
-                continue
-            setattr(self, option, value)
+        self.from_dict({k: v for k, v in options._get_kwargs()
+                        if v is not None})
 
     def _gen_argparse(self):
         parser = argparse.ArgumentParser()
-        for option in self._options:
+        for option in self._options.values():
             option.argparse_option(parser)
         return parser
 
-    def from_files(self, paths=DEFAULT_PATHS, type='ini'):
+    def from_files(self, paths=DEFAULT_PATHS, cfg=ConfigTypes.ini):
+        if isinstance(paths, str):
+            paths = [paths]
+        if isinstance(cfg, str):
+            cfg = ConfigTypes[cfg]
+
         paths = self._format_paths(paths)
         for p in paths:
             if os.path.exists(p) and os.path.isfile(p):
-                self.read_file(p, type=type)
+                key_value = self.read_file(p, cfg=cfg)
+                self.from_dict(key_value)
 
-    def read_file(self, p, type):
-        if type == 'ini':
+    def from_dict(self, options_dict):
+        for k, v in options_dict.items():
+            option = self._options.get(k, None)
+            if option is None:
+                continue
+
+            new_v = option.deserialize(v)
+            setattr(self, k, new_v)
+
+    def read_file(self, p, cfg):
+        if cfg == ConfigTypes.ini:
             return self._read_ini(p)
-        if type == 'yaml':
+        elif cfg == ConfigTypes.yaml:
             return self._read_yaml(p)
+        elif cfg == ConfigTypes.json:
+            return self._read_json(p)
+        else:
+            raise ValueError("unknown type: %s" % cfg)
 
-    @staticmethod
-    def _read_ini(path):
+    def _read_ini(self, path):
+        if self.ini_config_section is None:
+            raise ValueError()
         parser = ConfigParser()
         parser.read(path)
-        import ipdb; ipdb.set_trace()
-        content = ConfigParser.read(path)
+        return {k:v for k,v in list(parser[self.ini_config_section].items())}
+
+    def _read_yaml(self, path):
+        with open(path) as file:
+            content = yaml.load(file.read())
+        return content
+
+    def _read_json(self, path):
+        with open(path) as file:
+            content = json.loads(file.read())
+        return content
 
     def _format_paths(self, paths):
+        namerc = self.namerc or self.name + 'rc'
         return [p.format(name=self.name, namerc=self.name+'rc')
                 for p in paths]
 
 
-
 class OptionReader:
-    def __init__(self, cls, base_class=Argumentize):
-        self.cls = cls
+    def __init__(self, inspected_class, base_class=Argumentize):
+        self.cl = inspected_class
         self.base_class = base_class
 
     @property
     def options(self):
         options = dict()
-        for cls in self._inheriting_classes:
-            class_options = self.read_class_options(cls)
+        for cl in self._inheriting_classes:
+            class_options = self.read_class_options(cl)
             for o in class_options:
                 if o.name in options:
                     continue
                 options[o.name] = o
 
-        return options.values()
+        return options
 
-    def read_class_options(self, cls):
-        for name in dir(cls):
-            attr = getattr(cls, name)
+    @staticmethod
+    def read_class_options(cl):
+        for name in dir(cl):
+            attr = getattr(cl, name)
             if isinstance(attr, Option):
                 attr.name = name
                 yield attr
 
     @property
     def _inheriting_classes(self):
-        for c in inspect.getmro(self.cls):
+        for c in inspect.getmro(self.cl):
             if c is self.base_class:
                 return
             yield c

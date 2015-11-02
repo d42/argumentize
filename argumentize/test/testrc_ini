@@ -1,0 +1,4 @@
+[foo]
+test_opt1 = 55
+test_opt2 = herp derp
+test_opt3 = True
