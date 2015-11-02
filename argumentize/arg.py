@@ -85,7 +85,7 @@ class Argumentize:
             raise ValueError()
         parser = ConfigParser()
         parser.read(path)
-        return {k:v for k,v in list(parser[self.ini_config_section].items())}
+        return {k:v for k,v in parser.items(self.ini_config_section)}
 
     def _read_yaml(self, path):
         with open(path) as file:
