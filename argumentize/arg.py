@@ -3,11 +3,14 @@ from .options import Option
 import os
 import sys
 import json
+import logging
 from enum import Enum
 
 import inspect
 import argparse
 from six.moves.configparser import ConfigParser
+
+logger = logging.getLogger('argumentize')
 
 import yaml
 
@@ -37,11 +40,11 @@ class Argumentize:
         self._options = OptionReader(self.__class__).options
         self.from_dict({o.name: o.value for o in self._options.values()})
 
-    def from_args(self, args):
+    def from_args(self, args, verbose=False):
         parser = self._gen_argparse()
         options = parser.parse_args(args)
         self.from_dict({k: v for k, v in options._get_kwargs()
-                        if v is not None})
+                        if v is not None}, verbose)
 
     def _gen_argparse(self):
         parser = argparse.ArgumentParser()
@@ -49,7 +52,7 @@ class Argumentize:
             option.argparse_option(parser)
         return parser
 
-    def from_files(self, paths=DEFAULT_PATHS, cfg=ConfigTypes.ini):
+    def from_files(self, paths=DEFAULT_PATHS, cfg=ConfigTypes.ini, verbose=False):
         if isinstance(paths, str):
             paths = [paths]
         if isinstance(cfg, str):
@@ -57,15 +60,19 @@ class Argumentize:
 
         paths = self._format_paths(paths)
         for p in paths:
+            if verbose:
+                logger.info("checking %s", p)
             if os.path.exists(p) and os.path.isfile(p):
                 key_value = self.read_file(p, cfg=cfg)
-                self.from_dict(key_value)
+                self.from_dict(key_value, verbose)
 
-    def from_dict(self, options_dict):
+    def from_dict(self, options_dict, verbose=False):
         for k, v in options_dict.items():
             option = self._options.get(k, None)
             if option is None:
                 continue
+            if verbose:
+                logger.info("set %s to %s", k, v)
 
             new_v = option.deserialize(v)
             setattr(self, k, new_v)
