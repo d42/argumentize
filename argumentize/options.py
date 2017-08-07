@@ -27,7 +27,7 @@ class OptionBool(Option):
 
     def argparse_option(self, parser):
         action = 'store_false' if self.value else 'store_true'
-        parser.add_argument(self.arg_name, action=action)
+        parser.add_argument(self.arg_name, action=action, dest=self.name)
 
     @property
     def arg_name(self):
