@@ -38,7 +38,17 @@ class Argumentize:
     def __init__(self, name):
         self.name = name
         self._options = OptionReader(self.__class__).options
-        self.from_dict({o.name: o.value for o in self._options.values()})
+        self.from_class(self)
+
+    def from_class(self, cls):
+        options = OptionReader(cls.__class__).options
+        opts = {
+            o.name: o.value
+            for o in self._options.values()
+            if not o.is_required
+        }
+        self.from_dict(opts)
+
 
     def from_args(self, args, verbose=False):
         parser = self._gen_argparse()
@@ -71,11 +81,10 @@ class Argumentize:
             option = self._options.get(k, None)
             if option is None:
                 continue
-            if verbose:
-                logger.info("set %s to %s", k, v)
 
-            new_v = option.deserialize(v)
-            setattr(self, k, new_v)
+            new_v = option.setopt(self, v)
+            if verbose:
+                logger.info("set %s to %s", k, new_v)
 
     def read_file(self, p, cfg):
         if cfg == ConfigTypes.ini:
