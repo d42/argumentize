@@ -16,7 +16,7 @@ class Option:
             value=self.value, name=self.name, cls=str(self.__class__))
 
     def argparse_option(self, parser):
-        parser.add_argument(self.arg_name, type=self.type, required=self.is_required)
+        parser.add_argument(self.arg_name, type=self.type, required=self.is_required, help=self.help)
 
     @property
     def arg_name(self):
@@ -45,8 +45,8 @@ class OptionBool(Option):
     type = bool
 
     def argparse_option(self, parser):
-        action = 'store_false' if self.value else 'store_true'
-        parser.add_argument(self.arg_name, action=action, dest=self.name, required=self.is_required)
+        const = False if self.value else True
+        parser.add_argument(self.arg_name, action='store_const', dest=self.name, const=const, help=self.help)
 
     @property
     def arg_name(self):
