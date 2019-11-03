@@ -76,4 +76,4 @@ class OptionStr(Option):
     type = str
 
     @staticmethod
-    def _deserialize(value): return str(value)
+    def _deserialize(value): return str(value) if value is not None else value
