@@ -105,7 +105,7 @@ class Argumentize:
 
     def _read_yaml(self, path):
         with open(path) as file:
-            content = yaml.load(file.read())
+            content = yaml.safe_load(file.read())
         return content
 
     def _read_json(self, path):
