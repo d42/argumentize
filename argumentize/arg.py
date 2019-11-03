@@ -16,7 +16,11 @@ import yaml
 
 
 XDG_CONFIG_DIR = os.environ.get('XDG_CONFIG_DIR', '.config')
-CURRENT_DIR = os.path.abspath(os.path.dirname(sys.argv[0]))
+
+if getattr(sys, 'frozen', False):
+    CURRENT_DIR = os.path.dirname(sys.executable)
+else:
+    CURRENT_DIR = os.path.abspath(os.path.dirname(sys.argv[0]))
 
 DEFAULT_PATHS = tuple([
     os.path.expanduser('~/.{namerc}'),
